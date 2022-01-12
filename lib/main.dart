@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
-import 'package:assets_audio_player/assets_audio_player.dart';
+import 'package:just_audio/just_audio.dart';
 
 void main() {
   runApp(const MyApp());
@@ -39,7 +39,9 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   Map<String, dynamic> radio = {};
   List _items = [];
-  final assetsAudioPlayer = AssetsAudioPlayer();
+  final player = AudioPlayer();
+  List _tags = [];
+  List _selected = [];
 
   // Fetch content from the json file
   Future<void> readJson() async {
@@ -48,6 +50,16 @@ class _MainPageState extends State<MainPage> {
     setState(() {
       _items = data;
     });
+    getAllTags(data);
+  }
+
+  void getAllTags(data) {
+    for (var i = 0; i < data.length; i++) {
+      for (var j = 0; j < data[i]["tags"].length; j++) {
+        _tags.add(data[i]["tags"][j]);
+      }
+    }
+    _tags = _tags.toSet().toList();
   }
 
   Widget renderAllTags(data) {
@@ -60,13 +72,15 @@ class _MainPageState extends State<MainPage> {
 
   void nouvelleRadio(data) async {
     try {
+      // Unload audio and release decoders until needed again.
+      await player.stop();
+      await player.setUrl(data["url"]);
+      // Acquire platform decoders and start loading audio.
+      var duration = await player.load();
+      player.play();
       setState(() {
         radio = data;
       });
-      await assetsAudioPlayer.open(
-        Audio.liveStream(data["url"]),
-      );
-      print("MUSIQUE");
     } catch (t) {
       //mp3 unreachable
     }
@@ -90,13 +104,31 @@ class _MainPageState extends State<MainPage> {
                   child: Card(
                     margin: const EdgeInsets.all(10),
                     child: ListTile(
-                      title: Text(radio["name"]),
-                      subtitle: renderAllTags(radio["tags"]),
-                      trailing: Image(
-                        image: AssetImage(
-                            "assets/img/FRA_20200331/" + radio["img"]),
-                      ),
-                    ),
+                        title: Text(radio["name"]),
+                        subtitle: renderAllTags(radio["tags"]),
+                        trailing: SizedBox(
+                          width: 120,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      player.playing
+                                          ? player.stop()
+                                          : player.play();
+                                    });
+                                  },
+                                  icon: Icon(player.playing
+                                      ? Icons.pause
+                                      : Icons.play_arrow)),
+                              Image(
+                                image: AssetImage(
+                                    "assets/img/FRA_20200331/" + radio["img"]),
+                              )
+                            ],
+                          ),
+                        )),
                   ),
                 )
               : Container(),
