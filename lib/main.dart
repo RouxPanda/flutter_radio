@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:filter_list/filter_list.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,11 +18,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.deepPurple,
       ),
       home: Scaffold(
         appBar: AppBar(
-          title: const Text("wala"),
+          title: const Text("Radio"),
         ),
         body: const MainPage(),
       ),
@@ -39,9 +40,10 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   Map<String, dynamic> radio = {};
   List _items = [];
+  List _itemsSelected = [];
   final player = AudioPlayer();
-  List _tags = [];
-  List _selected = [];
+  List<String> _tags = [];
+  List<String>? selectedCountList = [];
 
   // Fetch content from the json file
   Future<void> readJson() async {
@@ -49,6 +51,7 @@ class _MainPageState extends State<MainPage> {
     final data = await json.decode(response);
     setState(() {
       _items = data;
+      _itemsSelected = data;
     });
     getAllTags(data);
   }
@@ -86,6 +89,39 @@ class _MainPageState extends State<MainPage> {
     }
   }
 
+  void _openFilterDialog() async {
+    await FilterListDialog.display<String>(context,
+        listData: _tags,
+        selectedListData: selectedCountList,
+        height: 480,
+        headlineText: "Select Count",
+        searchFieldHintText: "Search Here", choiceChipLabel: (item) {
+      return item;
+    }, validateSelectedItem: (list, val) {
+      return list!.contains(val);
+    }, onItemSearch: (list, text) {
+      if (list!.any(
+          (element) => element.toLowerCase().contains(text.toLowerCase()))) {
+        return list
+            .where(
+                (element) => element.toLowerCase().contains(text.toLowerCase()))
+            .toList();
+      } else {
+        return [];
+      }
+    }, onApplyButtonClick: (list) {
+      if (list != null) {
+        setState(() {
+          selectedCountList = List.from(list);
+          _itemsSelected =
+              _items.where((i) => list.any(i["tags"].contains)).toList();
+        });
+        print(selectedCountList);
+      }
+      Navigator.pop(context);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -98,7 +134,7 @@ class _MainPageState extends State<MainPage> {
       children: [
         Container(
           height: 100,
-          decoration: const BoxDecoration(color: Colors.green),
+          decoration: const BoxDecoration(color: Colors.white),
           child: radio.isNotEmpty
               ? Center(
                   child: Card(
@@ -131,11 +167,49 @@ class _MainPageState extends State<MainPage> {
                         )),
                   ),
                 )
-              : Container(),
+              : Card(
+                  margin: const EdgeInsets.all(10),
+                  child: ListTile(
+                    title: Text("Aucune radio en lecture"),
+                    trailing: IconButton(
+                        onPressed: () {}, icon: Icon(Icons.play_arrow)),
+                  ),
+                ),
         ),
-        Container(
-          height: 200,
-          decoration: const BoxDecoration(color: Colors.red),
+        Center(
+          child: Container(
+            height: 100,
+            width: 400,
+            decoration: const BoxDecoration(
+              color: Colors.black38,
+              borderRadius: BorderRadius.all(Radius.circular(20.0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.add),
+                  onPressed: _openFilterDialog,
+                ),
+                selectedCountList!.isNotEmpty
+                    ? Container(
+                        width: 330,
+                        child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Row(
+                                  children: selectedCountList!.map((item) {
+                                return Container(
+                                    margin: EdgeInsets.all(5),
+                                    child: Text(item));
+                              }).toList()),
+                            )),
+                      )
+                    : Container()
+              ],
+            ),
+          ),
         ),
         Expanded(
           child: Container(
@@ -145,24 +219,24 @@ class _MainPageState extends State<MainPage> {
               child: Column(
                 children: [
                   // Display the data loaded from sample.json
-                  _items.isNotEmpty
+                  _itemsSelected.isNotEmpty
                       ? Expanded(
                           child: ListView.builder(
-                            itemCount: _items.length,
+                            itemCount: _itemsSelected.length,
                             itemBuilder: (context, index) {
                               return Card(
                                 margin: const EdgeInsets.all(10),
                                 child: ListTile(
                                   onTap: () {
-                                    nouvelleRadio(_items[index]);
+                                    nouvelleRadio(_itemsSelected[index]);
                                   },
-                                  title: Text(_items[index]["name"]),
-                                  subtitle:
-                                      renderAllTags(_items[index]["tags"]),
+                                  title: Text(_itemsSelected[index]["name"]),
+                                  subtitle: renderAllTags(
+                                      _itemsSelected[index]["tags"]),
                                   trailing: Image(
                                     image: AssetImage(
                                         "assets/img/FRA_20200331/" +
-                                            _items[index]["img"]),
+                                            _itemsSelected[index]["img"]),
                                   ),
                                 ),
                               );
